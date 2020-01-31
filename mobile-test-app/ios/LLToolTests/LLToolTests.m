@@ -12,7 +12,8 @@
 #import <React/RCTRootView.h>
 
 #define TIMEOUT_SECONDS 1800
-#define TEXT_TO_LOOK_FOR @"success OVERALL"
+#define SUCCESSTEXT @"success OVERALL"
+#define ERRORTEXT @"error found"
 
 @interface LLToolTests : XCTestCase
 
@@ -44,11 +45,19 @@
     [[NSRunLoop mainRunLoop] runMode:NSRunLoopCommonModes beforeDate:[NSDate dateWithTimeIntervalSinceNow:0.1]];
 
     foundElement = [self findSubviewInView:vc.view matching:^BOOL(UIView *view) {
-      if ([view.accessibilityLabel isEqualToString:TEXT_TO_LOOK_FOR]) {
+      if ([view.accessibilityLabel isEqualToString:SUCCESSTEXT]) {
         return YES;
       }
       return NO;
     }];
+
+
+    XCTAssertTrue(![self findSubviewInView:vc.view matching:^BOOL(UIView *view) {
+      if ([view.accessibilityLabel isEqualToString:ERRORTEXT]) {
+        return YES;
+      }
+      return NO;
+    }], @"error was found"); // TODO how to get the actual text of the error.
   }
   
 #ifdef DEBUG
