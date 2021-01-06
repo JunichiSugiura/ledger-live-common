@@ -42,7 +42,6 @@ import type {
   CounterValuesStateRaw,
   CountervaluesSettings,
 } from "./types";
-import { pairId } from "./helpers";
 
 // Polling is the control object you get from the high level <PollingConsumer>{ polling => ...
 export type Polling = {
@@ -97,19 +96,23 @@ export function Countervalues({
 
   // trigger poll but not every time poll callback is changed
   const [triggerPoll, setTriggerPoll] = useState(false);
-  useEffect(() => {
-    if (pending || !triggerPoll) return;
-    setTriggerPoll(false);
-    dispatch({ type: "pending" });
-    loadCountervalues(state, userSettings).then(
-      (state) => {
-        dispatch({ type: "success", payload: state });
-      },
-      (error) => {
-        dispatch({ type: "error", payload: error });
-      }
-    );
-  }, [pending, state, userSettings, triggerPoll]);
+  useDebouncedEffect(
+    ({ pending, state, userSettings, triggerPoll }) => {
+      if (pending || !triggerPoll) return;
+      setTriggerPoll(false);
+      dispatch({ type: "pending" });
+      loadCountervalues(state, userSettings).then(
+        (state) => {
+          dispatch({ type: "success", payload: state });
+        },
+        (error) => {
+          dispatch({ type: "error", payload: error });
+        }
+      );
+    },
+    { pending, state, userSettings, triggerPoll },
+    10 * 1000
+  );
 
   useEffect(() => {
     if (!savedState?.status || !Object.keys(savedState.status).length) return;
@@ -120,20 +123,9 @@ export function Countervalues({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [savedState]);
 
-  // trigger poll only when trackingPairs is not exactly the same
-  const pairs = useMemo(
-    () => userSettings.trackingPairs.map(pairId).sort().join(),
-    [userSettings.trackingPairs]
-  );
-
-  const isFirstRender = useRef(true);
   useEffect(() => {
-    if (isFirstRender.current) {
-      isFirstRender.current = false;
-      return;
-    }
     setTriggerPoll(true);
-  }, [pairs]);
+  }, [userSettings]);
 
   const [isPolling, setIsPolling] = useState(true);
   useEffect(() => {
@@ -435,4 +427,32 @@ export function useSendAmount({
     fiatUnit,
     calculateCryptoAmount,
   };
+}
+
+function useDebouncedValue(value, delay) {
+  const [debouncedValue, setDebouncedValue] = useState(value);
+
+  useEffect(
+    () => {
+      const handler = setTimeout(() => {
+        setDebouncedValue(value);
+      }, delay);
+
+      return () => {
+        clearTimeout(handler);
+      };
+    },
+    [value, delay] // Only re-call effect if value or delay changes
+  );
+
+  return debouncedValue;
+}
+
+function useDebouncedEffect(cb, deps, delay = 300) {
+  const cbRef = useRef(cb);
+  const debouncedDeps = useDebouncedValue(deps, delay);
+
+  useEffect(() => {
+    cbRef.current?.(debouncedDeps);
+  }, [debouncedDeps]);
 }
